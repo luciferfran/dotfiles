@@ -1,0 +1,13 @@
+- defaults:
+    link:
+      create: true
+      relink: true
+
+- clean: ['~']
+
+- link:
+    ~/.gitconfig: gitconfig
+    ~/oh-my-zsh: oh-my-zsh
+    ~/.profile: profile
+    ~/.zshrc: zshrc
+    ~/.tmux.conf: tmux.conf
