@@ -6,8 +6,8 @@
 - clean: ['~']
 
 - link:
-    ~/.bashrc: bashrc
-    ~/.gitconfig: gitconfig
-    ~/.profile: profile
-    ~/.tmux.conf: tmux.conf
-    ~/.zshrc: zshrc
+    ~/.bashrc: .bashrc
+    ~/.gitconfig: .gitconfig
+    ~/.profile: .profile
+    ~/.tmux.conf: .tmux.conf
+    ~/.zshrc: .zshrc
