@@ -2,6 +2,7 @@
     link:
       create: true
       relink: true
+      force: true
 
 - clean: ['~']
 
@@ -11,3 +12,4 @@
     ~/.profile: .profile
     ~/.tmux.conf: .tmux.conf
     ~/.zshrc: .zshrc
+    ~/.p10k.zsh: .p10k.zsh
