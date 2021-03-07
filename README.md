@@ -1,6 +1,9 @@
 # DOTBOT
 
-Instalamos dotbot https://github.com/anishathalye/dotbot
+Instalación:
+```console
+git clone https://github.com/luciferfran/dotfiles && cd dotfiles && ./install
+```
 
 
 Instalación estando en la carpeta raid de este proyecto
