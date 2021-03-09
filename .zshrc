@@ -110,3 +110,7 @@ source $ZSH/oh-my-zsh.sh
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 export PATH=/home/francisco/.symfony/bin:$PATH
+
+# Manual configurarion
+alias cat='batcat'
+alias catm='cat'
