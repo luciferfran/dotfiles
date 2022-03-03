@@ -113,4 +113,4 @@ export PATH=/home/francisco/.symfony/bin:$PATH
 
 # Manual configurarion
 alias cat='batcat'
-alias catm='cat'
+alias catm='/usr/bin/cat'
