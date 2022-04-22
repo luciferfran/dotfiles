@@ -14,3 +14,6 @@
     ~/.zshrc: .zshrc
     ~/.p10k.zsh: .p10k.zsh
     ~/.nanorc: .nanorc
+
+- shell:
+  - [git submodule update --init --recursive, Installing submodules]
