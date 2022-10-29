@@ -25,3 +25,7 @@ fi
 if [ -d "$HOME/.local/bin" ] ; then
     PATH="$HOME/.local/bin:$PATH"
 fi
+
+# ssh-agent
+#eval `keychain --eval --agents ssh id_ed25519`
+eval `ssh-agent`
