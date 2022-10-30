@@ -19,7 +19,7 @@
 ## Automatically indent a newly created line to the same number of
 ## tabs and/or spaces as the preceding line -- or as the next line
 ## if the preceding line is the beginning of a paragraph.
-# set autoindent
+ set autoindent
 
 ## Back up files to the current filename plus a tilde.
 # set backup
@@ -107,7 +107,7 @@
 # set nohelp
 
 ## Don't automatically add a newline when a file does not end with one.
-# set nonewlines
+ set nonewlines
 
 ## Set operating directory.  nano will not read or write files outside
 ## this directory and its subdirectories.  Also, the current directory
