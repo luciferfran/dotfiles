@@ -1,3 +1,5 @@
 [user]
 	email = luciferfran@gmail.com
 	name = Francisco
+[core]
+	editor = nano
