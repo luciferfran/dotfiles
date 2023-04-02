@@ -29,3 +29,19 @@ fi
 # ssh-agent
 #eval `keychain --eval --agents ssh id_ed25519`
 eval `ssh-agent`
+
+# creamos la variable de entorno con el nombre del socket Unix
+# (en este caso, dentro de ~/.ssh/
+export SSH_AUTH_SOCK=~/.ssh/ssh-agent.$HOSTNAME.sock
+
+# Verificamos si está corriendo el daemon ssh-agent
+ssh-add -l 2>/dev/null >/dev/null
+
+# si estaba corriendo, ssh-add lo usará y retornará 1 (no hay claves)
+# si no estaba corriendo, su retorno será 2, por lo que
+# procedemos a ejecutar el ssh-agent,
+# y le decimos dónde crear el socket Unix (SSH_AUTH_SOCK):
+
+if [ $? -ge 2 ]; then
+  ssh-agent -a "$SSH_AUTH_SOCK" >/dev/null
+fi
