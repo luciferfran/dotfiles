@@ -3,3 +3,5 @@
 	name = Francisco
 [core]
 	editor = nano
+[init]
+	defaultBranch = main
