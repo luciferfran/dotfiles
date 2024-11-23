@@ -1,0 +1,39 @@
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = false
+trim_trailing_whitespace = true
+
+[*.css]
+indent_size = 2
+indent_style = tab
+
+[.gitignore]
+insert_final_newline = false
+
+[*.html]
+indent_size = 2
+indent_style = tab
+insert_final_newline = false
+
+[*.ini]
+insert_final_newline = false
+
+[*.js]
+indent_size = 2
+indent_style = space
+insert_final_newline = false
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.php]
+indent_size = 4
+indent_style = space
+insert_final_newline = false
+
+[*.tpl]
+insert_final_newline = false
+
+[*.twig]
+insert_final_newline = false
