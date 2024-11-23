@@ -29,3 +29,8 @@ git clone https://github.com/luciferfran/dotfiles && cd dotfiles && ./install
 *   .p10k.sh
 *   .profile
 *   .zshrc
+
+## Actualizar dotbot
+```console
+git submodule update --remote dotbot
+```
