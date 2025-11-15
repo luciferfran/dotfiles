@@ -9,7 +9,7 @@
 #export PATH=$HOME/bin:/usr/local/bin:$PATH
 
 # Path to your oh-my-zsh installation.
-#export ZSH="/home/francisco/.oh-my-zsh"
+export ZSH="/home/francisco/.oh-my-zsh"
 
 # Set name of the theme to load --- if set to "random", it will
 # load a random theme each time oh-my-zsh is loaded, in which case,
@@ -78,7 +78,7 @@
 # Add wisely, as too many plugins slow down shell startup.
 #plugins=(git zsh-syntax-highlighting history-substring-search zsh-autosuggestions)
 
-#source $ZSH/oh-my-zsh.sh
+source $ZSH/oh-my-zsh.sh
 
 # User configuration
 
