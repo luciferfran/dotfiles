@@ -125,3 +125,8 @@ export NVM_DIR="$HOME/.nvm"
 eval "$(oh-my-posh init zsh --config ~/.poshthemes/craver.omp.json)"
 # opencode
 export PATH=/home/francisco/.opencode/bin:$PATH
+
+# Comandos rápidos para Rclone
+alias nubes='/home/francisco/rclone_montar.sh'
+alias nonubes='/home/francisco/rclone_desmontar.sh'
+alias cuantas='mount | grep rclone | wc -l'
