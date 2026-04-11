@@ -130,3 +130,6 @@ export PATH=/home/francisco/.opencode/bin:$PATH
 alias nubes='/home/francisco/rclone_montar.sh'
 alias nonubes='/home/francisco/rclone_desmontar.sh'
 alias cuantas='mount | grep rclone | wc -l'
+
+alias docker-on='sudo systemctl start docker && echo "Docker encendido"'
+alias docker-off='sudo systemctl stop docker && echo "Docker apagado"'
