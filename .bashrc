@@ -109,9 +109,7 @@ if [ -f ~/.bash_aliases ]; then
     . ~/.bash_aliases
 fi
 
-# enable programmable completion features (you don't need to enable
-# this, if it's already enabled in /etc/bash.bashrc and /etc/profile
-# sources /etc/bash.bashrc).
+# enable programmable completion features
 if ! shopt -oq posix; then
   if [ -f /usr/share/bash-completion/bash_completion ]; then
     . /usr/share/bash-completion/bash_completion
@@ -120,6 +118,5 @@ if ! shopt -oq posix; then
   fi
 fi
 
-#export PS1="\[\033[38;5;2m\]\u\[$(tput sgr0)\]\[\033[38;5;8m\]@\[$(tput sgr0)\]\[\033[38;5;226m\]\h\[$(tput sgr0)\]:\[$(tput sgr0)\]\[\033[38;5;4m\][\w]\[$(tput sgr0)\] \[$(tput sgr0)\] $ "
-export PS1="\[\033[38;5;2m\]\u\[$(tput sgr0)\]\[\033[38;5;8m\]@\[$(tput sgr0)\]\[\033[38;5;226m\]\h\[$(tput sgr0)\]:\[$(tput sgr0)\]\[\033[38;5;4m\][\w]\[\033[33m\]\$(parse_git_branch)\[\033[00m\] $ "
 export PATH="$HOME/.symfony/bin:$PATH"
+

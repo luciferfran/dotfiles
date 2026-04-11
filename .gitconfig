@@ -5,3 +5,8 @@
 	editor = nano
 [init]
 	defaultBranch = main
+[alias]
+	st = status
+	co = checkout
+	br = branch
+	lg = log --oneline --graph --all

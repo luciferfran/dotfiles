@@ -15,6 +15,7 @@
     ~/.p10k.zsh: .p10k.zsh
     ~/.nanorc: .nanorc
     ~/.editorconfig: .editorconfig
+    ~/.bash_aliases: .bash_aliases
 
 - shell:
   - [git submodule update --init --recursive, Installing submodules]
