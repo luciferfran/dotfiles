@@ -16,6 +16,8 @@
     ~/.nanorc: .nanorc
     ~/.editorconfig: .editorconfig
     ~/.bash_aliases: .bash_aliases
+    ~/.local/bin/nubes: bin/nubes
+    ~/.local/bin/nonubes: bin/nonubes
 
 - shell:
   - [git submodule update --init --recursive, Installing submodules]

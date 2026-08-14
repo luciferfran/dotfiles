@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -u
+
+MNT="$HOME/mnt"
+
+echo "Desmontando nubes en $MNT ..."
+
+for punto in "$MNT"/*; do
+    [ -d "$punto" ] || continue
+    if mountpoint -q "$punto" 2>/dev/null; then
+        if fusermount3 -u -z "$punto" 2>/dev/null; then
+            echo "  [ok] desmontada $punto"
+        else
+            echo "  [error] no se pudo desmontar $punto"
+        fi
+    else
+        rmdir "$punto" 2>/dev/null || true
+    fi
+done
+
+echo "Nubes desmontadas."

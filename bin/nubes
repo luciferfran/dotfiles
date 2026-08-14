@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -u
+
+MNT="$HOME/mnt"
+REMOTES=$(rclone listremotes | sed 's/:$//')
+
+echo "Montando nubes en $MNT ..."
+
+for r in $REMOTES; do
+    punto="$MNT/$r"
+    if mountpoint -q "$punto" 2>/dev/null; then
+        echo "  [ok] $r ya montada"
+        continue
+    fi
+    mkdir -p "$punto"
+    if rclone mount "$r:" "$punto" --daemon --vfs-cache-mode writes --buffer-size 32M \
+        --log-file /tmp/nubes-$r.log 2>/dev/null; then
+        echo "  [ok] $r -> $punto"
+    else
+        echo "  [error] $r no se pudo montar (log: /tmp/nubes-$r.log)"
+    fi
+done
+
+echo
+echo "Montadas:"
+mountpoint -q /dev/null 2>/dev/null; find "$MNT" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | while read -r p; do
+    if mountpoint -q "$p"; then echo "  $p"; fi
+done
