@@ -145,8 +145,12 @@ def render_codex(nombre: str, cfg: dict) -> str:
         if cfg.get("args"):
             args = ", ".join(f'"{a}"' for a in cfg["args"])
             lineas.append(f"args = [{args}]")
-        # Codex no interpola ${VAR}: las variables de envPassthrough las hereda
-        # del shell, así que no se escriben aquí. Sólo van los valores literales.
+        # Codex no propaga el entorno del proceso padre a los servidores MCP: sin
+        # declararlas aquí, el servidor arranca sin ellas y muere en el handshake.
+        # env_vars nombra las que debe heredar; env sólo admite valores literales.
+        if (heredadas := variables(cfg)):
+            nombres = ", ".join(f'"{v}"' for v in heredadas)
+            lineas.append(f"env_vars = [{nombres}]")
         if (entorno := cfg.get("env")):
             pares = ", ".join(f'{k} = "{v}"' for k, v in entorno.items())
             lineas.append(f"env = {{ {pares} }}")
