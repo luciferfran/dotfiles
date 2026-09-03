@@ -215,7 +215,9 @@ def nuevo_claude(texto: str, servidores: dict, prune: bool) -> str:
     # a MCP y hay que devolverlo con el mismo formato con el que vino.
     datos = json.loads(texto)
     datos["mcpServers"] = fusionar(datos.get("mcpServers", {}), servidores, prune)
-    return json.dumps(datos, indent=2, ensure_ascii=False) + "\n"
+    # Claude Code guarda el archivo sin salto final; añadirlo lo dejaría eternamente
+    # "pendiente de cambios" aunque la sección MCP esté idéntica.
+    return json.dumps(datos, indent=2, ensure_ascii=False) + ("\n" if texto.endswith("\n") else "")
 
 
 def nuevo_pi(texto: str, servidores: dict, prune: bool) -> str:
