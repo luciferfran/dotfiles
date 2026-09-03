@@ -18,6 +18,10 @@
     ~/.bash_aliases: .bash_aliases
     ~/.local/bin/nubes: bin/nubes
     ~/.local/bin/nonubes: bin/nonubes
+    ~/.local/bin/sync-mcp: bin/sync-mcp
+    ~/.agents/mcp.json: agents/mcp.json
 
 - shell:
   - [git submodule update --init --recursive, Installing submodules]
+  - command: mkdir -p ~/.agents/skills && ln -sfn ~/.agents/skills ~/.claude/skills
+    description: Skills compartidas por todos los agentes

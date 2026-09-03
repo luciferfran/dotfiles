@@ -1,0 +1,376 @@
+#!/usr/bin/env python3
+"""Propaga ~/.agents/mcp.json a la configuración MCP de cada cliente.
+
+Los clientes describen el mismo servidor de tres formas distintas (JSON con
+"mcpServers", TOML en Codex, esquema propio en opencode), así que un enlace
+simbólico no vale: hay que traducir. Este script mantiene una única fuente y
+reescribe SÓLO la sección MCP de cada archivo, dejando intacto todo lo demás.
+
+Por seguridad no escribe nada salvo que se pase --apply: sin ese flag imprime
+el diff de lo que haría.
+
+Uso:
+    sync-mcp                 # muestra el diff (equivale a --dry-run)
+    sync-mcp --apply         # escribe, con copia de seguridad de cada archivo
+    sync-mcp --prune         # además borra de los clientes lo que no esté en la fuente
+    sync-mcp --only claude,codex
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import difflib
+import json
+import os
+import re
+import shutil
+import sys
+from pathlib import Path
+
+FUENTE = Path.home() / ".agents" / "mcp.json"
+
+DESTINOS = {
+    "claude": Path.home() / ".claude.json",
+    "codex": Path.home() / ".codex" / "config.toml",
+    "opencode": Path.home() / ".config" / "opencode" / "opencode.jsonc",
+    "pi": Path.home() / ".config" / "mcp" / "mcp.json",
+}
+
+# Claves cuyo valor literal en la fuente sería un secreto en un archivo que
+# acaba versionado en dotfiles. Sólo se admiten referencias a variables.
+SOSPECHOSAS = re.compile(r"KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL", re.I)
+
+
+class ErrorFuente(Exception):
+    pass
+
+
+# --------------------------------------------------------------------------- #
+# Fuente
+# --------------------------------------------------------------------------- #
+
+def cargar_fuente(ruta: Path) -> dict:
+    if not ruta.is_file():
+        raise ErrorFuente(f"No existe la fuente {ruta}")
+
+    try:
+        datos = json.loads(ruta.read_text())
+    except json.JSONDecodeError as e:
+        raise ErrorFuente(f"{ruta} no es JSON válido: {e}") from e
+
+    servidores = datos.get("mcpServers")
+    if not isinstance(servidores, dict) or not servidores:
+        raise ErrorFuente(f'{ruta} no tiene un objeto "mcpServers" con contenido')
+
+    for nombre, cfg in servidores.items():
+        remoto = "url" in cfg
+        if not remoto and "command" not in cfg:
+            raise ErrorFuente(f'{nombre}: hace falta "url" (remoto) o "command" (local)')
+        for clave, valor in (cfg.get("env") or {}).items():
+            if SOSPECHOSAS.search(clave) and not re.fullmatch(r"\$\{\w+\}", str(valor)):
+                raise ErrorFuente(
+                    f'{nombre}: env "{clave}" lleva un valor literal. Este archivo se '
+                    f'versiona: usa "envPassthrough": ["{clave}"] y exporta la variable.'
+                )
+
+    return servidores
+
+
+def variables(cfg: dict) -> list[str]:
+    """Variables de entorno que el servidor toma del shell."""
+    return list(cfg.get("envPassthrough") or [])
+
+
+def token_bearer(cfg: dict) -> str | None:
+    auth = cfg.get("auth") or {}
+    return auth.get("tokenEnv") if auth.get("type") == "bearer" else None
+
+
+# --------------------------------------------------------------------------- #
+# Renderizado por cliente
+# --------------------------------------------------------------------------- #
+
+def render_claude(cfg: dict) -> dict:
+    if "url" in cfg:
+        salida = {"type": "http", "url": cfg["url"]}
+        if (var := token_bearer(cfg)):
+            salida["headers"] = {"Authorization": f"Bearer ${{{var}}}"}
+        return salida
+
+    entorno = dict(cfg.get("env") or {})
+    entorno.update({v: f"${{{v}}}" for v in variables(cfg)})
+    return {"type": "stdio", "command": cfg["command"], "args": cfg.get("args", []), "env": entorno}
+
+
+def render_pi(cfg: dict) -> dict:
+    if "url" in cfg:
+        salida = {"url": cfg["url"]}
+        if (var := token_bearer(cfg)):
+            salida.update({"auth": "bearer", "bearerTokenEnv": var})
+        return salida
+
+    salida = {"command": cfg["command"], "args": cfg.get("args", [])}
+    entorno = dict(cfg.get("env") or {})
+    entorno.update({v: f"$env:{v}" for v in variables(cfg)})
+    if entorno:
+        salida["env"] = entorno
+    return salida
+
+
+def render_opencode(cfg: dict) -> dict:
+    if "url" in cfg:
+        salida = {"type": "remote", "url": cfg["url"], "enabled": True}
+        if (var := token_bearer(cfg)):
+            salida["headers"] = {"Authorization": f"Bearer {{env:{var}}}"}
+        return salida
+
+    salida = {"type": "local", "command": [cfg["command"], *cfg.get("args", [])]}
+    entorno = dict(cfg.get("env") or {})
+    entorno.update({v: f"{{env:{v}}}" for v in variables(cfg)})
+    if entorno:
+        salida["environment"] = entorno
+    return salida
+
+
+def render_codex(nombre: str, cfg: dict) -> str:
+    lineas = [f"[mcp_servers.{nombre}]"]
+
+    if "url" in cfg:
+        lineas.append(f'url = "{cfg["url"]}"')
+        if (var := token_bearer(cfg)):
+            lineas.append(f'bearer_token_env_var = "{var}"')
+    else:
+        lineas.append(f'command = "{cfg["command"]}"')
+        if cfg.get("args"):
+            args = ", ".join(f'"{a}"' for a in cfg["args"])
+            lineas.append(f"args = [{args}]")
+        # Codex no interpola ${VAR}: las variables de envPassthrough las hereda
+        # del shell, así que no se escriben aquí. Sólo van los valores literales.
+        if (entorno := cfg.get("env")):
+            pares = ", ".join(f'{k} = "{v}"' for k, v in entorno.items())
+            lineas.append(f"env = {{ {pares} }}")
+
+    return "\n".join(lineas) + "\n"
+
+
+# --------------------------------------------------------------------------- #
+# Escritura
+# --------------------------------------------------------------------------- #
+
+def fusionar(actual: dict, nuevos: dict, prune: bool) -> dict:
+    """Los servidores que el cliente tiene y la fuente no se respetan salvo --prune.
+
+    Eso deja fuera de la fuente (y por tanto de dotfiles) los servidores con
+    credenciales literales, como grafana.
+    """
+    resultado = {} if prune else dict(actual)
+    resultado.update(nuevos)
+    return resultado
+
+
+def bloque_json(texto: str, clave: str) -> tuple[int, int] | None:
+    """Localiza el objeto de `clave` en un JSON(C) y devuelve (inicio, fin)."""
+    m = re.search(rf'"{clave}"\s*:\s*\{{', texto)
+    if not m:
+        return None
+
+    i = m.end() - 1
+    nivel, en_cadena, escapado = 0, False, False
+    for j in range(i, len(texto)):
+        c = texto[j]
+        if escapado:
+            escapado = False
+        elif c == "\\":
+            escapado = True
+        elif c == '"':
+            en_cadena = not en_cadena
+        elif not en_cadena:
+            if c == "{":
+                nivel += 1
+            elif c == "}":
+                nivel -= 1
+                if nivel == 0:
+                    return m.start(), j + 1
+    return None
+
+
+def compactar(texto: str) -> str:
+    """Deja los arrays de cadenas en una línea, que es como están escritos a mano."""
+    return re.sub(
+        r'\[\n((?:\s*"[^"\n]*",?\n)+)\s*\]',
+        lambda m: "[" + ", ".join(l.strip().rstrip(",") for l in m.group(1).strip().splitlines()) + "]",
+        texto,
+    )
+
+
+def sangrar(obj: dict, niveles: int) -> str:
+    sangria = "  " * niveles
+    volcado = compactar(json.dumps(obj, indent=2, ensure_ascii=False))
+    return "\n".join(sangria + l if i else l for i, l in enumerate(volcado.splitlines()))
+
+
+def nuevo_claude(texto: str, servidores: dict, prune: bool) -> str:
+    # Sin compactar: este archivo es de Claude Code, tiene miles de líneas ajenas
+    # a MCP y hay que devolverlo con el mismo formato con el que vino.
+    datos = json.loads(texto)
+    datos["mcpServers"] = fusionar(datos.get("mcpServers", {}), servidores, prune)
+    return json.dumps(datos, indent=2, ensure_ascii=False) + "\n"
+
+
+def nuevo_pi(texto: str, servidores: dict, prune: bool) -> str:
+    datos = json.loads(texto) if texto.strip() else {}
+    datos["mcpServers"] = fusionar(datos.get("mcpServers", {}), servidores, prune)
+    return compactar(json.dumps(datos, indent=2, ensure_ascii=False)) + "\n"
+
+
+def nuevo_opencode(texto: str, servidores: dict, prune: bool) -> str:
+    tramo = bloque_json(texto, "mcp")
+    if not tramo:
+        raise ErrorFuente('opencode.jsonc no tiene una clave "mcp"')
+
+    inicio, fin = tramo
+    try:
+        actual = json.loads(texto[inicio:fin].split(":", 1)[1].strip())
+    except json.JSONDecodeError as e:
+        raise ErrorFuente(f'el bloque "mcp" de opencode.jsonc no se puede leer ({e}); '
+                          "¿tiene comentarios dentro?") from e
+
+    fusion = fusionar(actual, servidores, prune)
+    return texto[:inicio] + '"mcp": ' + sangrar(fusion, 1) + texto[fin:]
+
+
+def nuevo_codex(texto: str, servidores: dict, prune: bool) -> str:
+    resultado = texto
+
+    if prune:
+        for nombre in re.findall(r"^\[mcp_servers\.([\w.-]+)\]", resultado, re.M):
+            if nombre not in servidores:
+                resultado = quitar_bloque_toml(resultado, nombre)
+
+    for nombre, cfg in servidores.items():
+        bloque = render_codex(nombre, cfg)
+        patron = re.compile(rf"^\[mcp_servers\.{re.escape(nombre)}\]\n(?:(?!^\[).*\n?)*", re.M)
+        if patron.search(resultado):
+            resultado = patron.sub(bloque, resultado, count=1)
+        else:
+            resultado = insertar_bloque_toml(resultado, bloque)
+
+    resultado = re.sub(r"\n+(\[)", r"\n\n\1", resultado.strip()) + "\n"
+
+    return resultado
+
+
+def insertar_bloque_toml(texto: str, bloque: str) -> str:
+    """Coloca el bloque junto a los demás [mcp_servers.*], no al final del archivo."""
+    ultimo = None
+    for m in re.finditer(r"^\[mcp_servers\.[\w.-]+\]\n(?:(?!^\[).*\n?)*", texto, re.M):
+        ultimo = m
+
+    if ultimo is None:
+        return texto.rstrip("\n") + "\n\n" + bloque
+
+    corte = ultimo.end()
+    return texto[:corte].rstrip("\n") + "\n\n" + bloque + "\n" + texto[corte:].lstrip("\n")
+
+
+def quitar_bloque_toml(texto: str, nombre: str) -> str:
+    patron = re.compile(rf"^\[mcp_servers\.{re.escape(nombre)}\]\n(?:(?!^\[).*\n?)*\n?", re.M)
+    return patron.sub("", texto)
+
+
+CONSTRUCTORES = {
+    "claude": (nuevo_claude, render_claude),
+    "codex": (nuevo_codex, None),
+    "opencode": (nuevo_opencode, render_opencode),
+    "pi": (nuevo_pi, render_pi),
+}
+
+
+def procesar(cliente: str, fuente: dict, prune: bool) -> tuple[str, str] | None:
+    """Devuelve (texto_actual, texto_nuevo) o None si el cliente no está instalado."""
+    ruta = DESTINOS[cliente]
+    if not ruta.is_file():
+        return None
+
+    constructor, renderizador = CONSTRUCTORES[cliente]
+    servidores = fuente if renderizador is None else {n: renderizador(c) for n, c in fuente.items()}
+
+    actual = ruta.read_text()
+    return actual, constructor(actual, servidores, prune)
+
+
+def escribir(ruta: Path, contenido: str) -> Path:
+    sello = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    respaldo = ruta.with_name(f"{ruta.name}.bak-{sello}")
+    shutil.copy2(ruta, respaldo)
+
+    temporal = ruta.with_name(f".{ruta.name}.tmp")
+    temporal.write_text(contenido)
+    os.replace(temporal, ruta)  # atómico: nadie ve el archivo a medias
+    return respaldo
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--apply", action="store_true", help="escribe los cambios (por defecto sólo muestra el diff)")
+    p.add_argument("--dry-run", action="store_true", help="no escribe nada; es el comportamiento por defecto")
+    p.add_argument("--prune", action="store_true", help="borra de los clientes los servidores que no estén en la fuente")
+    p.add_argument("--only", help="lista separada por comas: " + ", ".join(DESTINOS))
+    p.add_argument("--source", type=Path, default=FUENTE, help=f"fuente a usar (por defecto {FUENTE})")
+    args = p.parse_args()
+
+    if args.dry_run and args.apply:
+        print("--apply y --dry-run son incompatibles", file=sys.stderr)
+        return 2
+
+    try:
+        fuente = cargar_fuente(args.source)
+    except ErrorFuente as e:
+        print(f"❌  {e}", file=sys.stderr)
+        return 1
+
+    clientes = [c.strip() for c in args.only.split(",")] if args.only else list(DESTINOS)
+    if (desconocidos := set(clientes) - set(DESTINOS)):
+        print(f"❌  Cliente desconocido: {', '.join(sorted(desconocidos))}", file=sys.stderr)
+        return 2
+
+    cambios = 0
+    for cliente in clientes:
+        ruta = DESTINOS[cliente]
+        try:
+            resultado = procesar(cliente, fuente, args.prune)
+        except (ErrorFuente, json.JSONDecodeError) as e:
+            print(f"❌  {cliente}: {e}", file=sys.stderr)
+            return 1
+
+        if resultado is None:
+            print(f"—   {cliente}: no instalado ({ruta})")
+            continue
+
+        actual, nuevo = resultado
+        if actual == nuevo:
+            print(f"✅  {cliente}: ya está al día")
+            continue
+
+        cambios += 1
+        if args.apply:
+            respaldo = escribir(ruta, nuevo)
+            print(f"✍   {cliente}: actualizado {ruta} (copia en {respaldo.name})")
+        else:
+            print(f"\n=== {cliente}: {ruta} ===")
+            diff = difflib.unified_diff(
+                actual.splitlines(keepends=True), nuevo.splitlines(keepends=True),
+                fromfile=str(ruta), tofile=f"{ruta} (nuevo)", n=2,
+            )
+            sys.stdout.writelines(diff)
+
+    if not args.apply and cambios:
+        print(f"\n{cambios} archivo(s) cambiarían. Repite con --apply para escribir.")
+        print("Cierra Claude Code antes de aplicar: reescribe ~/.claude.json por su cuenta.")
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

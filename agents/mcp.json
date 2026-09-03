@@ -1,0 +1,18 @@
+{
+  "$comentario": "Fuente única de servidores MCP. Se propaga con `sync-mcp`. Este archivo se versiona: aquí sólo van nombres de variables de entorno, nunca sus valores.",
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    },
+    "nan": {
+      "url": "https://api.nan.builders/mcp",
+      "auth": { "type": "bearer", "tokenEnv": "NAN_API_KEY" }
+    },
+    "nan-media": {
+      "command": "npx",
+      "args": ["-y", "nan-mcp-server@1.0.7"],
+      "envPassthrough": ["NAN_API_KEY"]
+    }
+  }
+}
