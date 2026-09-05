@@ -11,7 +11,7 @@
     },
     "nan-media": {
       "command": "npx",
-      "args": ["-y", "nan-mcp-server@1.0.7"],
+      "args": ["-y", "nan-mcp-server@1.0.8"],
       "envPassthrough": ["NAN_API_KEY"]
     }
   }
