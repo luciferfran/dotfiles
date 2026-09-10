@@ -3,16 +3,20 @@
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"]
-    },
-    "nan": {
-      "url": "https://api.nan.builders/mcp",
-      "auth": { "type": "bearer", "tokenEnv": "NAN_API_KEY" }
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ]
     },
     "nan-media": {
       "command": "npx",
-      "args": ["-y", "nan-mcp-server@1.0.8"],
-      "envPassthrough": ["NAN_API_KEY"]
+      "args": [
+        "-y",
+        "nan-mcp-server@1.0.9"
+      ],
+      "envPassthrough": [
+        "NAN_API_KEY"
+      ]
     }
   }
 }
