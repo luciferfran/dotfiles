@@ -12,7 +12,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "nan-mcp-server@1.1.0"
+        "nan-mcp-server@1.1.1"
       ],
       "envPassthrough": [
         "NAN_API_KEY"
