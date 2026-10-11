@@ -9,11 +9,7 @@
       ]
     },
     "nan-media": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "nan-mcp-server@1.2.0"
-      ],
+      "command": "nan-mcp-server",
       "envPassthrough": [
         "NAN_API_KEY"
       ]
